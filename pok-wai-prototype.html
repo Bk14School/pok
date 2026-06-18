@@ -1,0 +1,554 @@
+<!-- ปกไว — Thai report cover generator prototype -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ปกไว — หน้าปกรายงาน</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Anuphan:wght@400;500;600;700&family=Kanit:wght@300;400;500&family=Prompt:wght@300;400;500;600&family=Mali:wght@400;500;600&display=swap');
+
+  :root{
+    --ink:#243A5E; --ink-soft:#41547A; --paper-cool:#ECEFF5; --paper:#FFFFFF;
+    --accent:#E7873C; --accent-strong:#C96A22; --line:#D8DEE9; --line-soft:#E6EAF1;
+    --muted:#6B7790; --shadow:0 18px 50px -20px rgba(36,58,94,.45);
+  }
+  *{box-sizing:border-box} html,body{margin:0;height:100%}
+  body{font-family:'Anuphan',system-ui,sans-serif; background:var(--paper-cool); color:var(--ink); -webkit-font-smoothing:antialiased;}
+
+  /* ---------- top bar ---------- */
+  .topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:20;}
+  .brand{display:flex;align-items:baseline;gap:10px;font-weight:700;letter-spacing:.5px}
+  .brand .logo{font-size:20px;background:var(--accent);color:var(--ink);border-radius:8px;padding:3px 9px;font-weight:700;}
+  .brand small{font-weight:400;color:#A9B6CE;font-size:13px} .topbar .spacer{flex:1}
+  .btn-print{font-family:inherit;font-size:14px;font-weight:600;background:var(--accent);color:var(--ink);border:none;border-radius:9px;padding:9px 16px;cursor:pointer;transition:transform .12s ease, background .15s ease;}
+  .btn-print:hover{background:#F1973F}
+
+  .viewtoggle{display:none;gap:6px;padding:10px 16px 0}
+  .viewtoggle button{flex:1;font-family:inherit;font-size:14px;font-weight:600;padding:9px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink-soft);cursor:pointer;}
+  .viewtoggle button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  /* ---------- layout ---------- */
+  .app{display:grid;grid-template-columns:minmax(320px,400px) 1fr;gap:0;height:calc(100% - 58px);}
+  .editor{overflow-y:auto;padding:22px 22px 60px;border-right:1px solid var(--line);background:#fff;}
+  .group{margin-bottom:24px}
+  .group > .eyebrow{font-size:11px;font-weight:700;letter-spacing:1.4px;color:var(--accent-strong);text-transform:uppercase;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+  .group > .eyebrow::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+
+  label{display:block;margin-bottom:13px}
+  label .lab{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:5px;font-weight:500}
+  input[type=text], input[type=number], select{width:100%;font-family:inherit;font-size:15px;color:var(--ink);padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;transition:border-color .15s, box-shadow .15s;}
+  input:focus, select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(231,135,60,.18);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  input[type="color"] {width: 100%; height: 42px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; background: #fff;}
+  .filebtn{font-family:inherit;font-size:13px;color:var(--ink-soft);border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+  .filebtn:hover{border-color:var(--accent)}
+
+  .chips{display:flex;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+  .chip{font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink-soft);}
+  .chip[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .slider-row { display:flex; align-items:center; gap:10px; }
+  .slider-row input[type=range] { flex:1; accent-color: var(--accent); cursor:pointer; }
+  .slider-row span { font-size:13px; color:var(--muted); font-weight:500; }
+  .scale-value { display: inline-block; width: 42px; text-align: right; font-weight: 700; color: var(--ink); background: var(--line-soft); padding: 4px 6px; border-radius: 6px; }
+
+  .logoprev {width: 54px; height: 54px; border-radius: 50%; flex: none;border: 1px dashed var(--line); display: grid; place-items: center;font-size: 10px; color: var(--muted); text-align: center; overflow: hidden; background: #fafbfd;}
+  .logoprev img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* ภาพปกแบบใหม่ (Cover Editor) */
+  .cover-editor { display:none; margin-bottom: 12px; padding: 14px; background: #fafbfd; border: 1px solid var(--line); border-radius: 9px; }
+  .thumb-list { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .thumb-item { position:relative; width:54px; height:54px; border-radius:6px; overflow:hidden; border:2px solid transparent; cursor:pointer; transition: 0.15s; }
+  .thumb-item:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+  .thumb-item.active { border-color: var(--accent); transform: scale(1.08); box-shadow: 0 4px 15px rgba(231,135,60,0.3); z-index: 2; }
+  .thumb-item img { width:100%; height:100%; object-fit:cover; }
+  .thumb-item .del-btn { position:absolute; top:2px; right:2px; width:18px; height:18px; background:rgba(0,0,0,0.65); color:#fff; border-radius:50%; font-size:10px; border:none; cursor:pointer; display:grid; place-items:center; }
+  .thumb-item .del-btn:hover { background:#C0392B; }
+
+  /* กล่องควบคุมภาพเฉพาะรูป */
+  .advanced-controls { margin-top:12px; padding: 12px; background: #fff; border: 1px solid var(--line-soft); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+  .advanced-controls label { margin-bottom: 10px; }
+  .advanced-controls label:last-child { margin-bottom: 0; }
+
+  /* ---------- THE SHEET ---------- */
+  .stage{overflow-y:auto;padding:26px;display:flex;flex-direction:column;align-items:center;gap:18px;}
+  .sheetwrap{container-type:inline-size;width:100%;max-width:520px}
+
+  .sheet{
+    --scale: 0.90; --s-font: 'Sarabun', serif; --s-ink: #111; --s-accent: #E7873C; --logo-size: 5.2em;
+    width:100%;aspect-ratio:210/297;background:var(--paper);box-shadow:var(--shadow);border-radius:2px;
+    font-family: var(--s-font); color: var(--s-ink); font-size: calc(3.55cqw * var(--scale));
+    padding:2.6em 2.4em; display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;overflow:hidden;
+  }
+  .sheet > div { position: relative; z-index: 1; }
+  
+  .sheet .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; aspect-ratio: 1; opacity: 0.08; pointer-events: none; z-index: 0; }
+  .sheet .watermark img { width: 100%; height: 100%; object-fit: contain; }
+  
+  .sheet .crest{ width: var(--logo-size); height: var(--logo-size); margin-top: .4em; flex: none; display: grid; place-items: center; }
+  .sheet .crest img{ width: 100%; height: 100%; object-fit: contain; }
+  .sheet .crest.empty{ border-radius: 50%; border: 1px dashed #ddd; color: #aaa; font-size: .5em; background: #fafafa; overflow: hidden; }
+
+  .sheet .title{ font-size:2.05em;font-weight:700;line-height:1.25;margin:1.5em 0 0; max-width:90%; }
+  .sheet .midblock{margin-top:auto;margin-bottom:auto;line-height:1.85;font-size:1.05em}
+  .sheet .midblock .sub{font-size:.92em; opacity: 0.85;}
+  .sheet .block-head{font-weight:700;font-size:1.1em;margin:.2em 0 .15em}
+  .sheet .people{line-height:1.7}
+  .sheet .people > div{margin-bottom:.12em}
+  .sheet .people .no{white-space:nowrap}
+  .sheet .people.cols2{ column-count:2;column-gap:1.8em;text-align:left; width:100%;max-width:21em;margin:.25em auto 0; }
+  .sheet .people.dense{font-size:.9em;line-height:1.55}
+  .sheet .footer{line-height:1.8;font-size:1.02em;margin-bottom:.3em}
+
+  /* --- มินิมอล (Minimal Base) --- */
+  .sheet.minimal { text-align:left; align-items:stretch; padding:3em 2.6em 3em 4.6em; }
+  .sheet.minimal .crest { margin:0 0 1.4em; align-self:flex-start; }
+  .sheet.minimal .title { margin:0; max-width:100%; border-left:.18em solid var(--s-accent); padding-left:.6em; }
+  .sheet.minimal .accentbar { height:.2em; width:3em; background:var(--s-accent); margin:1.1em 0 0; }
+  .sheet.minimal .midblock { text-align:left; margin:1.4em 0; font-size:1em; }
+  .sheet.minimal .footer { text-align:left; }
+  .sheet.minimal .block-head { color:var(--s-ink); }
+  .sheet.minimal .people.cols2 { margin-left:0; max-width:24em; }
+  
+  .sheet.minimal .cover-photo {
+    width: 100%; height: 12.5em; margin: 1.5em 0 0.5em 0; 
+    border-radius: 4px; overflow: hidden; display: grid; gap: 4px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #e1e4e8;
+  }
+  
+  .sheet.minimal .cover-photo > div { overflow: hidden; width: 100%; height: 100%; position: relative; }
+  .sheet.minimal .cover-photo img { width: 100%; height: 100%; object-fit: cover; }
+  
+  .cover-1 { grid-template-columns: 1fr; }
+  .cover-2 { grid-template-columns: 1fr 1fr; }
+  .cover-3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+  .cover-3 > div:nth-child(1) { grid-row: span 2; } 
+  .cover-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+  /* --- ลูกเล่น: ชิคๆ (Chic) --- */
+  .sheet.minimal.style-chic::before { content: ""; position: absolute; top: -15%; right: -15%; width: 60%; aspect-ratio: 1; background: var(--s-accent); opacity: 0.08; border-radius: 50%; pointer-events: none; z-index: 0; }
+  .sheet.minimal.style-chic::after { content: ""; position: absolute; bottom: 12%; left: -8%; width: 25%; aspect-ratio: 1; border: 3px solid var(--s-accent); opacity: 0.15; border-radius: 20%; transform: rotate(15deg); pointer-events: none; z-index: 0; }
+  .sheet.minimal.style-chic .cover-photo { border-radius: 16px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+  .sheet.minimal.style-chic .accentbar { border-radius: 10px; width: 4.5em; height: 0.3em; }
+
+  /* --- ลูกเล่น: นิตยสาร (Magazine) --- */
+  .sheet.minimal.style-magazine .cover-photo {
+    order: -1; width: calc(100% + 7.2em); margin: -3em -2.6em 1.5em -4.6em; 
+    border-radius: 0; border: none; box-shadow: none; height: 16em; 
+  }
+  .sheet.minimal.style-magazine .crest { margin-top: 0; }
+  .sheet.minimal.style-magazine .title { border-width: .22em; }
+
+  /* Developer Credit Footer */
+  .dev-credit {
+    margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--line);
+    text-align: center; font-size: 13px; color: var(--muted); line-height: 1.6;
+  }
+  .dev-credit strong { color: var(--ink-soft); font-weight: 700; }
+
+  /* Scrollbars & Mobile */
+  .editor::-webkit-scrollbar,.stage::-webkit-scrollbar{width:9px}
+  .editor::-webkit-scrollbar-thumb,.stage::-webkit-scrollbar-thumb{background:#cdd5e2;border-radius:9px}
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr;height:auto} .editor{border-right:none;border-bottom:1px solid var(--line)}
+    .viewtoggle{display:flex} body.show-preview .editor{display:none} body.show-edit .stage{display:none}
+  }
+  @media print{
+    @page{size:A4;margin:0} .topbar,.editor,.viewtoggle,.stage .chips{display:none!important}
+    body{background:#fff} .app{display:block;height:auto} .stage{padding:0;display:block}
+    .sheetwrap{max-width:none;width:auto;container-type:normal}
+    .sheet{ box-shadow:none;border-radius:0;width:210mm;height:297mm; font-size:calc(7.45mm * var(--scale)); page-break-after:always; }
+  }
+</style>
+
+<div class="topbar">
+  <div class="brand"><span class="logo">ปก</span> ปกไว <small>หน้าปกรายงานเสร็จใน 1 นาที</small></div>
+  <div class="spacer"></div>
+  <button class="btn-print" onclick="window.print()">บันทึก / พิมพ์ PDF</button>
+</div>
+
+<div class="viewtoggle">
+  <button id="tEdit" aria-pressed="true" onclick="setView('edit')">แก้ไขข้อมูล</button>
+  <button id="tPrev" aria-pressed="false" onclick="setView('preview')">ดูตัวอย่าง</button>
+</div>
+
+<div class="app">
+  <div class="editor">
+
+    <div class="group">
+      <p class="eyebrow">การปรับแต่ง (Design)</p>
+      
+      <div class="chips" id="tplChips" style="margin-bottom:12px;">
+        <button class="chip" data-tpl="classic" aria-pressed="true" onclick="setTpl('classic')">คลาสสิก (ทางการ)</button>
+        <button class="chip" data-tpl="minimal" aria-pressed="false" onclick="setTpl('minimal')">มินิมอล (ทันสมัย)</button>
+      </div>
+
+      <!-- กล่องจัดการมินิมอลและภาพปก (MINI PHOTO EDITOR) -->
+      <div id="minimalSettingsBox" class="cover-editor">
+        <div style="margin-bottom: 16px;">
+          <span class="lab">ลูกเล่นเลย์เอาต์ (Layout Style)</span>
+          <select id="minimalStyle">
+            <option value="elegant">เรียบหรู (Elegant)</option>
+            <option value="chic">ชิคๆ (Chic)</option>
+            <option value="magazine">นิตยสาร (Magazine)</option>
+          </select>
+        </div>
+        
+        <div style="height:1px; background:var(--line); margin: 0 -14px 14px; opacity:0.6;"></div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="lab" style="margin:0">อัปโหลดภาพปก (รองรับหลายภาพ)</span>
+          <button class="filebtn" onclick="document.getElementById('coverFile').click()">+ เพิ่มรูป</button>
+        </div>
+        <input type="file" id="coverFile" accept=".png, .jpg, .jpeg, .webp, image/*" multiple hidden>
+        
+        <!-- พรีวิวภาพเล็กให้คลิกเลือก -->
+        <div class="thumb-list" id="thumbList"></div>
+
+        <!-- แถบเครื่องมือแต่งภาพ (แสดงเฉพาะเมื่อมีรูป) -->
+        <div id="advancedCoverControls" class="advanced-controls" style="display:none;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--accent-strong); margin-bottom: 10px; text-transform: uppercase;">
+            <span style="display:inline-block; width:8px; height:8px; background:var(--accent); border-radius:50%; margin-right:4px;"></span>
+            กำลังตั้งค่าภาพที่เลือก
+          </div>
+          
+          <label>
+            <div style="display:flex; justify-content:space-between;">
+              <span class="lab">ซูมภาพ (Zoom)</span>
+              <span class="lab" id="valZoom" style="color:var(--accent);">100%</span>
+            </div>
+            <div class="slider-row">
+              <span style="font-size:16px;">🖼️</span>
+              <input type="range" id="cZoom" min="100" max="250" value="100">
+              <span style="font-size:20px;">🔍</span>
+            </div>
+          </label>
+
+          <div class="row2" style="margin-bottom:8px;">
+            <label style="margin:0;">
+              <span class="lab">เลื่อนซ้าย-ขวา (Pan X)</span>
+              <input type="range" id="cPanX" min="0" max="100" value="50">
+            </label>
+            <label style="margin:0;">
+              <span class="lab">เลื่อนขึ้น-ลง (Pan Y)</span>
+              <input type="range" id="cPanY" min="0" max="100" value="50">
+            </label>
+          </div>
+
+          <label style="margin:0;">
+            <span class="lab">ฟิลเตอร์แต่งสี (Filter)</span>
+            <select id="cFilter" style="padding: 8px 10px; font-size: 14px;">
+              <option value="none">ต้นฉบับ (Original)</option>
+              <option value="grayscale(100%)">ขาวดำ (B&W)</option>
+              <option value="sepia(80%)">วินเทจ (Vintage)</option>
+              <option value="contrast(1.1) saturate(1.4)">สีสดใส (Vibrant)</option>
+              <option value="brightness(0.9) contrast(0.8) sepia(20%)">กล้องฟิล์ม (Film)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <label>
+        <span class="lab">สไตล์ตัวอักษร (ฟอนต์)</span>
+        <select id="fontFamily">
+          <option value="'Sarabun', serif">Sarabun (ทางการ / ค่าเริ่มต้น)</option>
+          <option value="'Kanit', sans-serif">Kanit (ทันสมัย / เรียบหรู)</option>
+          <option value="'Prompt', sans-serif">Prompt (อ่านง่าย / โมเดิร์น)</option>
+          <option value="'Mali', cursive">Mali (น่ารัก / ประถมวัย)</option>
+        </select>
+      </label>
+
+      <div class="row2" style="margin-bottom: 12px;">
+        <label style="margin:0"><span class="lab">สีหลัก (ข้อความ)</span><input type="color" id="inkColor" value="#111111"></label>
+        <label style="margin:0"><span class="lab">สีตกแต่ง (เส้น/เน้น)</span><input type="color" id="accentColor" value="#E7873C"></label>
+      </div>
+
+      <label style="margin-top: 6px;">
+        <span class="lab">ขนาดตัวอักษรและสัดส่วน</span>
+        <div class="slider-row">
+          <span>เล็ก</span>
+          <input type="range" id="fontScale" min="0.7" max="1.3" step="0.05" value="0.90" list="scaleTicks">
+          <span>ใหญ่</span>
+          <span class="scale-value" id="scaleNum">90%</span>
+        </div>
+        <datalist id="scaleTicks"><option value="0.70"></option><option value="0.80"></option><option value="0.90"></option><option value="1.00"></option><option value="1.10"></option><option value="1.20"></option><option value="1.30"></option></datalist>
+      </label>
+    </div>
+
+    <div class="group">
+      <p class="eyebrow">สถาบัน</p>
+      <!-- อัปเดตชื่อโรงเรียนตั้งต้นให้สอดคล้องกับโลโก้ สพฐ. -->
+      <label><span class="lab">ชื่อโรงเรียน / สถาบัน</span><input type="text" id="school" value="โรงเรียนบ้านคลอง 14"></label>
+      <label><span class="lab">สำนักงานเขตพื้นที่การศึกษา</span><input type="text" id="area" value="สำนักงานเขตพื้นที่การศึกษาประถมศึกษานครนายก"></label>
+      <div class="lab" style="margin-bottom:5px">ตราโรงเรียน (ถ้ามี)</div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <!-- พรีวิวโลโก้ตั้งต้น -->
+        <div class="logoprev" id="logoPrev">
+          <img src="https://raw.githubusercontent.com/Bk14School/photo/refs/heads/main/logo-OBEC.png" alt="">
+        </div>
+        <button class="filebtn" onclick="document.getElementById('logoFile').click()">เปลี่ยนโลโก้</button>
+        <input type="file" id="logoFile" accept=".png, .jpg, .jpeg, .webp, image/*" hidden>
+      </div>
+      
+      <!-- เปิดแถบควบคุมขนาดโลโก้ตั้งแต่แรก -->
+      <label id="logoSizeWrap" style="display:block; margin-top:12px;">
+        <span class="lab">ปรับขนาดตราสถาบันบนหน้าปก</span>
+        <div class="slider-row">
+          <span>เล็ก</span><input type="range" id="logoSizeRange" min="3" max="10" step="0.2" value="5.2"><span>ใหญ่</span>
+        </div>
+      </label>
+      <!-- เปิดการใช้งานลายน้ำตั้งแต่แรก -->
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;" id="watermarkWrap">
+        <input type="checkbox" id="showWatermark" style="width:18px;height:18px;accent-color:var(--accent);">
+        <span style="font-size:14px;font-weight:500;">ทำเป็นลายน้ำตรงกลางกระดาษ</span>
+      </label>
+    </div>
+
+    <div class="group">
+      <p class="eyebrow">เรื่อง</p>
+      <label><span class="lab">ชื่อเรื่องรายงาน</span><input type="text" id="title" value="ระบบสุริยะและดาวเคราะห์"></label>
+      <div class="row2">
+        <label><span class="lab">วิชา</span><input type="text" id="subject" value="วิทยาศาสตร์"></label>
+        <label><span class="lab">รหัสวิชา</span><input type="text" id="code" value="ว21101"></label>
+      </div>
+    </div>
+
+    <div class="group">
+      <p class="eyebrow">จัดทำโดย</p>
+      <div class="row2" style="margin-bottom:10px">
+        <label style="margin:0"><span class="lab">ชั้น</span><input type="text" id="grade" value="ม.1"></label>
+        <label style="margin:0"><span class="lab">ห้อง</span><input type="text" id="room" value="3"></label>
+      </div>
+      <div id="members"></div>
+      <button class="add" onclick="addMember()">+ เพิ่มสมาชิก (งานกลุ่ม)</button>
+    </div>
+
+    <div class="group">
+      <p class="eyebrow">เสนอ</p>
+      <label style="margin:0"><span class="lab">ครูผู้สอน</span><input type="text" id="teacher" value="คุณครู"></label>
+    </div>
+
+    <div class="group">
+      <p class="eyebrow">ภาคเรียน</p>
+      <div class="row2">
+        <label style="margin:0"><span class="lab">ภาคเรียนที่</span><select id="term"><option>1</option><option>2</option></select></label>
+        <label style="margin:0"><span class="lab">ปีการศึกษา (พ.ศ.)</span><input type="text" id="year" value="2569"></label>
+      </div>
+    </div>
+
+    <!-- เครดิตผู้พัฒนา -->
+    <div class="dev-credit">
+      <strong>ผู้พัฒนาระบบ</strong><br>
+      KruBank โรงเรียนบ้านคลอง 14<br>
+      <small>สพป.นครนายก</small>
+    </div>
+
+  </div>
+
+  <div class="stage">
+    <div class="chips">
+      <button class="chip" data-tpl="classic" aria-pressed="true" onclick="setTpl('classic')">คลาสสิก (ทางการ)</button>
+      <button class="chip" data-tpl="minimal" aria-pressed="false" onclick="setTpl('minimal')">มินิมอล (ทันสมัย)</button>
+    </div>
+    <div class="sheetwrap">
+      <div class="sheet classic" id="sheet"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const val = id => $(id).value.trim();
+  const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  let tpl = 'classic';
+  
+  // กำหนดโลโก้ตั้งต้นเป็น URL ที่ระบุ
+  let logoData = 'https://raw.githubusercontent.com/Bk14School/photo/refs/heads/main/logo-OBEC.png';
+  
+  let coversArray = []; 
+  let activeCoverIndex = -1;
+
+  let members = [ {name:'ด.ช. ภาคิน รุ่งเรือง', no:'12'}, {name:'ด.ญ. ปาลิดา ศรีสุข', no:'21'} ];
+
+  /* --- Members logic --- */
+  function renderMembers(){
+    const box = $('members'); box.innerHTML='';
+    members.forEach((m,i)=>{
+      const row=document.createElement('div'); row.style.display='grid'; row.style.gridTemplateColumns='1fr 92px 34px'; row.style.gap='8px'; row.style.marginBottom='10px'; row.style.alignItems='end';
+      row.innerHTML=`
+        <label style="margin:0"><span class="lab">ชื่อ-นามสกุล</span><input type="text" data-i="${i}" data-k="name" value="${esc(m.name)}"></label>
+        <label style="margin:0"><span class="lab">เลขที่</span><input type="text" data-i="${i}" data-k="no" value="${esc(m.no)}"></label>
+        <button style="border:1px solid var(--line);background:#fff;border-radius:8px;height:40px;cursor:pointer;color:var(--muted);font-size:18px;line-height:1" title="ลบ" onclick="delMember(${i})">×</button>`;
+      box.appendChild(row);
+    });
+    box.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('input',e=>{ members[e.target.dataset.i][e.target.dataset.k]=e.target.value; render(); });
+    });
+  }
+  function addMember(){ members.push({name:'',no:''}); renderMembers(); render(); }
+  function delMember(i){ if(members.length>1) members.splice(i,1); renderMembers(); render(); }
+
+  /* --- Render Document --- */
+  function render(){
+    const crestInner = logoData ? `<img src="${logoData}" alt="">` : (tpl==='classic') ? 'ตรา<br>สถาบัน' : 'โลโก้';
+    const crestCls = logoData ? 'crest' : 'crest empty';
+    const watermarkHTML = (logoData && $('showWatermark').checked) ? `<div class="watermark"><img src="${logoData}" alt=""></div>` : '';
+    
+    let coverHTML = '';
+    if(tpl === 'minimal' && coversArray.length > 0) {
+      const num = Math.min(coversArray.length, 4);
+      const images = coversArray.slice(0, 4).map(c => `
+        <div>
+          <img src="${c.src}" alt="cover" style="
+            object-position: ${c.x}% ${c.y}%; 
+            transform: scale(${c.zoom / 100}); 
+            filter: ${c.filter};
+          ">
+        </div>
+      `).join('');
+      coverHTML = `<div class="cover-photo cover-${num}">${images}</div>`;
+    }
+
+    const classCls = [val('grade'), val('room')?('ห้อง '+val('room')):''].filter(Boolean).join(' ');
+    const subjLine = `รายงานนี้เป็นส่วนหนึ่งของวิชา ${esc(val('subject'))}` + (val('code')? ` (${esc(val('code'))})` : '');
+    const termLine = `ภาคเรียนที่ ${esc(val('term'))} &nbsp;ปีการศึกษา ${esc(val('year'))}`;
+    const areaLine = val('area') ? `<br>${esc(val('area'))}` : '';
+
+    let peopleHTML = members.filter(m=>m.name||m.no).map(m=> `<div>${esc(m.name)}${m.no ? ` <span class="no">เลขที่ ${esc(m.no)}</span>` : ''}</div>`).join('') || '<div>—</div>';
+    let peopleCls = 'people'; 
+    const n = members.filter(m=>m.name||m.no).length;
+    if(n >= 7) peopleCls += ' dense'; if(n >= 12) peopleCls += ' cols2';
+
+    let inner;
+    if(tpl==='minimal'){
+      inner = `${watermarkHTML}<div class="${crestCls}">${crestInner}</div><div class="title">${esc(val('title'))||'ชื่อเรื่องรายงาน'}</div><div class="accentbar"></div>
+        ${coverHTML}
+        <div class="midblock"><div class="sub">${subjLine}</div></div>
+        <div style="margin-top:auto"><div class="block-head">จัดทำโดย</div><div class="${peopleCls}">${peopleHTML}</div><div style="margin:.5em 0">ชั้น ${esc(classCls)}</div><div class="block-head">เสนอ</div><div>${esc(val('teacher'))}</div><div class="footer" style="margin-top:1em">${termLine}<br>${esc(val('school'))}${areaLine}</div></div>`;
+    } else {
+      inner = `${watermarkHTML}<div class="${crestCls}">${crestInner}</div><div class="title">${esc(val('title'))||'ชื่อเรื่องรายงาน'}</div><div class="midblock"><div class="sub">${subjLine}</div></div>
+        <div><div class="block-head">จัดทำโดย</div><div class="${peopleCls}">${peopleHTML}</div><div style="margin:.35em 0">ชั้น ${esc(classCls)}</div></div>
+        <div style="margin-top:1em"><div class="block-head">เสนอ</div><div>${esc(val('teacher'))}</div></div><div class="footer" style="margin-top:auto">${termLine}<br>${esc(val('school'))}${areaLine}</div>`;
+    }
+    
+    const minStyle = $('minimalStyle') ? $('minimalStyle').value : 'elegant';
+    $('sheet').className = 'sheet ' + tpl + (n>=7?' compact':'') + (tpl==='minimal' ? ' style-'+minStyle : '');
+    $('sheet').innerHTML = inner;
+  }
+
+  /* --- Global UI & Style Handlers --- */
+  function setTpl(t){
+    tpl=t;
+    document.querySelectorAll('.chip').forEach(c=> c.setAttribute('aria-pressed', c.dataset.tpl===t));
+    $('minimalSettingsBox').style.display = (t === 'minimal') ? 'block' : 'none';
+    render();
+  }
+  function setView(v){
+    document.body.classList.toggle('show-preview', v==='preview'); document.body.classList.toggle('show-edit', v==='edit');
+    $('tEdit').setAttribute('aria-pressed', v==='edit'); $('tPrev').setAttribute('aria-pressed', v==='preview');
+  }
+
+  $('fontScale').addEventListener('input', e => { $('sheet').style.setProperty('--scale', e.target.value); $('scaleNum').innerText = Math.round(e.target.value * 100) + '%'; });
+  $('fontFamily').addEventListener('change', e => { $('sheet').style.setProperty('--s-font', e.target.value); });
+  $('inkColor').addEventListener('input', e => { $('sheet').style.setProperty('--s-ink', e.target.value); });
+  $('accentColor').addEventListener('input', e => { $('sheet').style.setProperty('--s-accent', e.target.value); });
+  $('minimalStyle').addEventListener('change', render);
+  $('logoSizeRange').addEventListener('input', e => { $('sheet').style.setProperty('--logo-size', e.target.value + 'em'); });
+  $('showWatermark').addEventListener('change', render);
+
+  $('logoFile').addEventListener('change',e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ 
+      logoData=r.result; 
+      $('logoPrev').classList.remove('empty'); $('logoPrev').innerHTML=`<img src="${logoData}" alt="">`; 
+      // ปุ่มควบคุมต่างๆ จะถูกเปิดไว้ตั้งแต่แรกแล้ว แต่ถ้ากรณีที่โหลดมาตอนแรกไม่มี ก็ย้ำเปิดอีกที
+      $('watermarkWrap').style.opacity = '1'; $('watermarkWrap').style.pointerEvents = 'auto'; $('logoSizeWrap').style.display = 'block';
+      render(); 
+    };
+    r.readAsDataURL(f);
+  });
+
+  /* --- MINI PHOTO EDITOR LOGIC --- */
+  $('coverFile').addEventListener('change', e => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    files.forEach(f => {
+      const r = new FileReader();
+      r.onload = () => { 
+        coversArray.push({ src: r.result, zoom: 100, x: 50, y: 50, filter: 'none' }); 
+        activeCoverIndex = coversArray.length - 1; 
+        renderCoverThumbs(); 
+        updateControlSliders();
+        render(); 
+      };
+      r.readAsDataURL(f);
+    });
+    $('coverFile').value = ''; 
+  });
+
+  function renderCoverThumbs() {
+    const list = $('thumbList');
+    list.innerHTML = '';
+    
+    if(coversArray.length > 0) {
+      $('advancedCoverControls').style.display = 'block';
+    } else {
+      $('advancedCoverControls').style.display = 'none';
+      return;
+    }
+
+    coversArray.forEach((c, index) => {
+      const item = document.createElement('div');
+      item.className = 'thumb-item' + (index === activeCoverIndex ? ' active' : '');
+      item.onclick = () => {
+        activeCoverIndex = index;
+        renderCoverThumbs(); 
+        updateControlSliders(); 
+      };
+      
+      item.innerHTML = `
+        <img src="${c.src}" style="filter:${c.filter}">
+        <button class="del-btn" onclick="event.stopPropagation(); removeCover(${index})">✕</button>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  function updateControlSliders() {
+    if (activeCoverIndex < 0 || activeCoverIndex >= coversArray.length) return;
+    const activeData = coversArray[activeCoverIndex];
+    $('cZoom').value = activeData.zoom;
+    $('valZoom').innerText = activeData.zoom + '%'; 
+    $('cPanX').value = activeData.x;
+    $('cPanY').value = activeData.y;
+    $('cFilter').value = activeData.filter;
+  }
+
+  $('cZoom').addEventListener('input', e => { 
+    coversArray[activeCoverIndex].zoom = e.target.value; 
+    $('valZoom').innerText = e.target.value + '%';
+    render(); 
+  });
+  $('cPanX').addEventListener('input', e => { coversArray[activeCoverIndex].x = e.target.value; render(); });
+  $('cPanY').addEventListener('input', e => { coversArray[activeCoverIndex].y = e.target.value; render(); });
+  $('cFilter').addEventListener('change', e => { 
+    coversArray[activeCoverIndex].filter = e.target.value; 
+    renderCoverThumbs(); 
+    render(); 
+  });
+
+  function removeCover(index) {
+    coversArray.splice(index, 1);
+    if(activeCoverIndex >= coversArray.length) {
+      activeCoverIndex = coversArray.length - 1;
+    }
+    renderCoverThumbs();
+    if(coversArray.length > 0) updateControlSliders();
+    render();
+  }
+
+  /* ---- Init ---- */
+  ['school','area','title','subject','code','grade','room','teacher','term','year'].forEach(id=>$(id).addEventListener('input',render));
+  renderMembers(); render(); 
+  $('sheet').style.setProperty('--scale', $('fontScale').value);
+</script>
