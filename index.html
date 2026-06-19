@@ -179,10 +179,14 @@
   }
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <div class="topbar">
   <div class="brand"><span class="logo">ปก</span> ปกไว <small>หน้าปกรายงานเสร็จใน 1 นาที</small></div>
   <div class="spacer"></div>
-  <button class="btn-print" onclick="window.print()">บันทึก / พิมพ์ PDF</button>
+  <button class="btn-print" id="btnPdf" onclick="savePDF()">📄 บันทึก PDF (พอดี 1 หน้า)</button>
+  <button class="btn-print" onclick="window.print()" style="margin-left:8px;background:#fff;color:var(--ink);border:1px solid rgba(255,255,255,.35);">พิมพ์</button>
 </div>
 
 <div class="viewtoggle">
@@ -671,11 +675,49 @@
     }
   }
 
+  /* --- บันทึกเป็น PDF หน้าเดียว (ชัวร์ทุกเครื่อง รวมถึง iPad) --- */
+  async function savePDF(){
+    const b = $('btnPdf'); const orig = b.textContent;
+    b.textContent = 'กำลังสร้าง PDF...'; b.disabled = true; b.style.opacity = '.7';
+    try{
+      if(!window.html2canvas || !window.jspdf) throw new Error('โหลดไลบรารีไม่สำเร็จ (เช็คอินเทอร์เน็ต)');
+      if(document.fonts && document.fonts.ready) await document.fonts.ready;
+      fitToPage();
+      const sheet = $('sheet');
+      const canvas = await html2canvas(sheet, { scale: 3, useCORS: true, backgroundColor: '#ffffff', logging: false });
+      const img = canvas.toDataURL('image/jpeg', 0.95);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      pdf.addImage(img, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');   // เต็มหน้า A4 = 1 หน้าตายตัว
+      const name = (val('title') || 'ปกรายงาน').replace(/[\\/:*?"<>|]/g, '').slice(0, 60);
+      pdf.save(name + '.pdf');
+    }catch(e){
+      alert('บันทึก PDF ไม่สำเร็จ: ' + e.message + '\n\nถ้าใช้โลโก้จากลิงก์ ลองอัปโหลดโลโก้เป็นไฟล์ภาพแทน แล้วลองใหม่ครับ');
+      console.log(e);
+    }finally{
+      b.textContent = orig; b.disabled = false; b.style.opacity = '1';
+    }
+  }
+
+  /* แปลงโลโก้ตั้งต้น (ลิงก์) เป็น data URL ไว้ก่อน เพื่อให้บันทึก PDF ได้ไม่ติดปัญหาความปลอดภัยรูปข้ามโดเมน */
+  async function preloadLogo(){
+    if(!logoData || logoData.startsWith('data:')) return;
+    try{
+      const res = await fetch(logoData, { mode: 'cors', cache: 'force-cache' });
+      const blob = await res.blob();
+      const dataUrl = await new Promise((ok, err)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=err; r.readAsDataURL(blob); });
+      logoData = dataUrl;
+      $('logoPrev').innerHTML = `<img src="${logoData}" alt="">`;
+      render();
+    }catch(e){ console.log('แปลงโลโก้เป็น data URL ไม่ได้ (จะใช้ลิงก์ตามเดิม):', e.message); }
+  }
+
   /* ---- Init ---- */
   ['school','area','title','subject','code','grade','room','teacher','term','year'].forEach(id=>$(id).addEventListener('input',render));
   renderMembers(); render(); 
   $('sheet').style.setProperty('--scale', $('fontScale').value);
   loadDatabase();
+  preloadLogo();
 
   // คำนวณการย่อให้พอดีหน้าใหม่ เมื่อฟอนต์โหลดเสร็จ / โหลดหน้าเสร็จ / หมุนจอหรือปรับขนาด
   if(document.fonts && document.fonts.ready){ document.fonts.ready.then(fitToPage); }
