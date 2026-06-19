@@ -137,6 +137,14 @@
   .sheet.minimal.style-magazine .crest { margin-top: 0; }
   .sheet.minimal.style-magazine .title { border-width: .22em; }
 
+  /* Member rows (with prefix) */
+  .member-row{ border:1px solid var(--line-soft); border-radius:9px; padding:10px; margin-bottom:10px; background:#fafbfd; }
+  .member-row .mrow-top{ display:grid; grid-template-columns:108px 1fr; gap:8px; margin-bottom:8px; }
+  .member-row .mrow-bot{ display:grid; grid-template-columns:1fr 40px; gap:8px; align-items:end; }
+  .member-row .prefix-sel{ padding-left:8px; padding-right:6px; }
+  .member-row .del-member{ border:1px solid var(--line); background:#fff; border-radius:8px; height:40px; cursor:pointer; color:var(--muted); font-size:18px; line-height:1; }
+  .member-row .del-member:hover{ border-color:#C0392B; color:#C0392B; }
+
   /* Developer Credit Footer */
   .dev-credit {
     margin-top: 32px; padding-top: 24px; border-top: 1px dashed var(--line);
@@ -379,24 +387,42 @@
   let coversArray = []; 
   let activeCoverIndex = -1;
 
-  let members = [ {name:'ด.ช. ภาคิน รุ่งเรือง', no:'12'}, {name:'ด.ญ. ปาลิดา ศรีสุข', no:'21'} ];
+  // คำนำหน้า: ค่าใน dropdown (ย่อ) + ชื่อเต็มที่จะไปแสดงบนหน้าปก
+  const PREFIXES = [
+    {v:'ด.ช.', t:'ด.ช.'}, {v:'ด.ญ.', t:'ด.ญ.'},
+    {v:'นาย', t:'นาย'}, {v:'น.ส.', t:'น.ส.'}, {v:'', t:'ไม่ระบุ'}
+  ];
+  const PREFIX_FULL = { 'ด.ช.':'เด็กชาย', 'ด.ญ.':'เด็กหญิง', 'นาย':'นาย', 'น.ส.':'นางสาว' };
+  function prefixOptions(sel){
+    return PREFIXES.map(p=>`<option value="${p.v}"${p.v===sel?' selected':''}>${p.t}</option>`).join('');
+  }
+
+  let members = [ {prefix:'ด.ช.', name:'ภาคิน รุ่งเรือง', no:'12'}, {prefix:'ด.ญ.', name:'ปาลิดา ศรีสุข', no:'21'} ];
 
   /* --- Members logic --- */
   function renderMembers(){
     const box = $('members'); box.innerHTML='';
     members.forEach((m,i)=>{
-      const row=document.createElement('div'); row.style.display='grid'; row.style.gridTemplateColumns='1fr 92px 34px'; row.style.gap='8px'; row.style.marginBottom='10px'; row.style.alignItems='end';
+      const row=document.createElement('div'); row.className='member-row';
       row.innerHTML=`
-        <label style="margin:0"><span class="lab">ชื่อ-นามสกุล</span><input type="text" data-i="${i}" data-k="name" value="${esc(m.name)}"></label>
-        <label style="margin:0"><span class="lab">เลขที่</span><input type="text" data-i="${i}" data-k="no" value="${esc(m.no)}"></label>
-        <button style="border:1px solid var(--line);background:#fff;border-radius:8px;height:40px;cursor:pointer;color:var(--muted);font-size:18px;line-height:1" title="ลบ" onclick="delMember(${i})">×</button>`;
+        <div class="mrow-top">
+          <label style="margin:0"><span class="lab">คำนำหน้า</span>
+            <select class="prefix-sel" data-i="${i}" data-k="prefix">${prefixOptions(m.prefix)}</select>
+          </label>
+          <label style="margin:0"><span class="lab">ชื่อ-นามสกุล</span><input type="text" data-i="${i}" data-k="name" value="${esc(m.name)}"></label>
+        </div>
+        <div class="mrow-bot">
+          <label style="margin:0"><span class="lab">เลขที่</span><input type="text" data-i="${i}" data-k="no" value="${esc(m.no)}"></label>
+          <button class="del-member" title="ลบ" onclick="delMember(${i})">×</button>
+        </div>`;
       box.appendChild(row);
     });
-    box.querySelectorAll('input').forEach(inp=>{
-      inp.addEventListener('input',e=>{ members[e.target.dataset.i][e.target.dataset.k]=e.target.value; render(); });
+    box.querySelectorAll('input, select').forEach(inp=>{
+      const evt = inp.tagName === 'SELECT' ? 'change' : 'input';
+      inp.addEventListener(evt, e=>{ members[e.target.dataset.i][e.target.dataset.k]=e.target.value; render(); });
     });
   }
-  function addMember(){ members.push({name:'',no:''}); renderMembers(); render(); }
+  function addMember(){ members.push({prefix:'ด.ญ.', name:'', no:''}); renderMembers(); render(); }
   function delMember(i){ if(members.length>1) members.splice(i,1); renderMembers(); render(); }
 
   /* --- Render Document --- */
@@ -425,7 +451,11 @@
     const termLine = `ภาคเรียนที่ ${esc(val('term'))} &nbsp;ปีการศึกษา ${esc(val('year'))}`;
     const areaLine = val('area') ? `<br>${esc(val('area'))}` : '';
 
-    let peopleHTML = members.filter(m=>m.name||m.no).map(m=> `<div>${esc(m.name)}${m.no ? ` <span class="no">เลขที่ ${esc(m.no)}</span>` : ''}</div>`).join('') || '<div>—</div>';
+    let peopleHTML = members.filter(m=>m.name||m.no).map(m=>{
+      const full = PREFIX_FULL[m.prefix] || '';
+      const nm = (full ? full+' ' : '') + (m.name||'');
+      return `<div>${esc(nm)}${m.no ? ` <span class="no">เลขที่ ${esc(m.no)}</span>` : ''}</div>`;
+    }).join('') || '<div>—</div>';
     let peopleCls = 'people'; 
     const n = members.filter(m=>m.name||m.no).length;
     if(n >= 7) peopleCls += ' dense'; if(n >= 12) peopleCls += ' cols2';
