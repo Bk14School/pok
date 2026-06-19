@@ -73,9 +73,9 @@
   .sheetwrap{container-type:inline-size;width:100%;max-width:520px}
 
   .sheet{
-    --scale: 0.90; --s-font: 'Sarabun', serif; --s-ink: #111; --s-accent: #E7873C; --logo-size: 5.2em;
+    --scale: 0.90; --fit: 1; --s-font: 'Sarabun', serif; --s-ink: #111; --s-accent: #E7873C; --logo-size: 5.2em;
     width:100%;aspect-ratio:210/297;background:var(--paper);box-shadow:var(--shadow);border-radius:2px;
-    font-family: var(--s-font); color: var(--s-ink); font-size: calc(3.55cqw * var(--scale));
+    font-family: var(--s-font); color: var(--s-ink); font-size: calc(3.55cqw * var(--scale) * var(--fit));
     padding:2.6em 2.4em; display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;overflow:hidden;
   }
   .sheet > div { position: relative; z-index: 1; }
@@ -171,7 +171,7 @@
       width:210mm; height:296mm;          /* ลด 1mm กันเนื้อหาล้นไปหน้า 2 บน iOS */
       aspect-ratio:auto;                   /* ปิด aspect-ratio ตอนพิมพ์ */
       overflow:hidden;                     /* คลิปเศษที่เกินทิ้ง */
-      font-size:calc(7.45mm * var(--scale));
+      font-size:calc(7.45mm * var(--scale) * var(--fit));
       page-break-after:avoid; break-after:avoid;     /* เลิกบังคับขึ้นหน้าใหม่ (ตัวการหน้าเปล่า) */
       page-break-inside:avoid; break-inside:avoid;
       -webkit-print-color-adjust:exact; print-color-adjust:exact;  /* ให้พื้นหลังสี/ลูกเล่นพิมพ์ติด */
@@ -436,6 +436,20 @@
   function addMember(){ members.push({prefix:'ด.ญ.', name:'', no:''}); renderMembers(); render(); }
   function delMember(i){ if(members.length>1) members.splice(i,1); renderMembers(); render(); }
 
+  /* --- ย่อเนื้อหาให้พอดี 1 หน้ากระดาษ (กันหลุดไปหน้า 2 ตอนพิมพ์) --- */
+  function fitToPage(){
+    const sheet = $('sheet');
+    if(!sheet) return;
+    let fit = 1, guard = 0;
+    sheet.style.setProperty('--fit', '1');
+    // ถ้าเนื้อหาสูงเกินกรอบกระดาษ ค่อยๆ หดลงทีละนิดจนพอดี
+    while(sheet.scrollHeight > sheet.clientHeight - 2 && fit > 0.6 && guard < 40){
+      fit -= 0.02;
+      sheet.style.setProperty('--fit', fit.toFixed(3));
+      guard++;
+    }
+  }
+
   /* --- Render Document --- */
   function render(){
     const crestInner = logoData ? `<img src="${logoData}" alt="">` : (tpl==='classic') ? 'ตรา<br>สถาบัน' : 'โลโก้';
@@ -486,6 +500,7 @@
     const minStyle = $('minimalStyle') ? $('minimalStyle').value : 'elegant';
     $('sheet').className = 'sheet ' + tpl + (n>=7?' compact':'') + (tpl==='minimal' ? ' style-'+minStyle : '');
     $('sheet').innerHTML = inner;
+    fitToPage();
   }
 
   /* --- Global UI & Style Handlers --- */
@@ -500,12 +515,12 @@
     $('tEdit').setAttribute('aria-pressed', v==='edit'); $('tPrev').setAttribute('aria-pressed', v==='preview');
   }
 
-  $('fontScale').addEventListener('input', e => { $('sheet').style.setProperty('--scale', e.target.value); $('scaleNum').innerText = Math.round(e.target.value * 100) + '%'; });
-  $('fontFamily').addEventListener('change', e => { $('sheet').style.setProperty('--s-font', e.target.value); });
+  $('fontScale').addEventListener('input', e => { $('sheet').style.setProperty('--scale', e.target.value); $('scaleNum').innerText = Math.round(e.target.value * 100) + '%'; fitToPage(); });
+  $('fontFamily').addEventListener('change', e => { $('sheet').style.setProperty('--s-font', e.target.value); fitToPage(); });
   $('inkColor').addEventListener('input', e => { $('sheet').style.setProperty('--s-ink', e.target.value); });
   $('accentColor').addEventListener('input', e => { $('sheet').style.setProperty('--s-accent', e.target.value); });
   $('minimalStyle').addEventListener('change', render);
-  $('logoSizeRange').addEventListener('input', e => { $('sheet').style.setProperty('--logo-size', e.target.value + 'em'); });
+  $('logoSizeRange').addEventListener('input', e => { $('sheet').style.setProperty('--logo-size', e.target.value + 'em'); fitToPage(); });
   $('showWatermark').addEventListener('change', render);
 
   $('logoFile').addEventListener('change',e=>{
@@ -661,4 +676,10 @@
   renderMembers(); render(); 
   $('sheet').style.setProperty('--scale', $('fontScale').value);
   loadDatabase();
+
+  // คำนวณการย่อให้พอดีหน้าใหม่ เมื่อฟอนต์โหลดเสร็จ / โหลดหน้าเสร็จ / หมุนจอหรือปรับขนาด
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(fitToPage); }
+  window.addEventListener('load', fitToPage);
+  window.addEventListener('resize', fitToPage);
+  window.addEventListener('beforeprint', fitToPage);
 </script>
