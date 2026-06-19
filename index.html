@@ -152,10 +152,22 @@
     .viewtoggle{display:flex} body.show-preview .editor{display:none} body.show-edit .stage{display:none}
   }
   @media print{
-    @page{size:A4;margin:0} .topbar,.editor,.viewtoggle,.stage .chips{display:none!important}
-    body{background:#fff} .app{display:block;height:auto} .stage{padding:0;display:block}
-    .sheetwrap{max-width:none;width:auto;container-type:normal}
-    .sheet{ box-shadow:none;border-radius:0;width:210mm;height:297mm; font-size:calc(7.45mm * var(--scale)); page-break-after:always; }
+    @page{ size:A4; margin:0; }
+    html,body{ margin:0; padding:0; height:auto; background:#fff; }
+    .topbar,.editor,.viewtoggle,.stage .chips{ display:none!important; }
+    .app{ display:block; height:auto; }
+    .stage{ padding:0; margin:0; gap:0; display:block; }
+    .sheetwrap{ max-width:none; width:auto; margin:0; container-type:normal; }
+    .sheet{
+      box-shadow:none; border-radius:0;
+      width:210mm; height:296mm;          /* ลด 1mm กันเนื้อหาล้นไปหน้า 2 บน iOS */
+      aspect-ratio:auto;                   /* ปิด aspect-ratio ตอนพิมพ์ */
+      overflow:hidden;                     /* คลิปเศษที่เกินทิ้ง */
+      font-size:calc(7.45mm * var(--scale));
+      page-break-after:avoid; break-after:avoid;     /* เลิกบังคับขึ้นหน้าใหม่ (ตัวการหน้าเปล่า) */
+      page-break-inside:avoid; break-inside:avoid;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;  /* ให้พื้นหลังสี/ลูกเล่นพิมพ์ติด */
+    }
   }
 </style>
 
