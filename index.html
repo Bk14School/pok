@@ -193,6 +193,8 @@
 <div class="app">
   <div class="editor">
 
+    <div id="dbStatus" style="font-size:12px;line-height:1.5;padding:8px 10px;border-radius:8px;margin-bottom:16px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;">กำลังโหลดรายชื่อ...</div>
+
     <div class="group">
       <p class="eyebrow">การปรับแต่ง (Design)</p>
       
@@ -296,8 +298,14 @@
     <div class="group">
       <p class="eyebrow">สถาบัน</p>
       <!-- อัปเดตชื่อโรงเรียนตั้งต้นให้สอดคล้องกับโลโก้ สพฐ. -->
-      <label><span class="lab">ชื่อโรงเรียน / สถาบัน</span><input type="text" id="school" list="schoolList" value="โรงเรียนบ้านคลอง 14"><datalist id="schoolList"></datalist></label>
-      <label><span class="lab">สำนักงานเขตพื้นที่การศึกษา</span><input type="text" id="area" list="areaList" value="สำนักงานเขตพื้นที่การศึกษาประถมศึกษานครนายก"><datalist id="areaList"></datalist></label>
+      <label><span class="lab">ชื่อโรงเรียน / สถาบัน</span>
+        <select id="schoolSel" onchange="onPick('school')"></select>
+        <input type="text" id="school" value="โรงเรียนบ้านคลอง 14" placeholder="พิมพ์ชื่อโรงเรียน" style="display:none;margin-top:8px;">
+      </label>
+      <label><span class="lab">สำนักงานเขตพื้นที่การศึกษา</span>
+        <select id="areaSel" onchange="onPick('area')"></select>
+        <input type="text" id="area" value="สำนักงานเขตพื้นที่การศึกษาประถมศึกษานครนายก" placeholder="พิมพ์ชื่อสำนักงานเขต" style="display:none;margin-top:8px;">
+      </label>
       <div class="lab" style="margin-bottom:5px">ตราโรงเรียน (ถ้ามี)</div>
       <div style="display:flex; align-items:center; gap:12px;">
         <!-- พรีวิวโลโก้ตั้งต้น -->
@@ -343,7 +351,10 @@
 
     <div class="group">
       <p class="eyebrow">เสนอ</p>
-      <label style="margin:0"><span class="lab">ครูผู้สอน</span><input type="text" id="teacher" list="teacherList" value="คุณครู"><datalist id="teacherList"></datalist></label>
+      <label style="margin:0"><span class="lab">ครูผู้สอน</span>
+        <select id="teacherSel" onchange="onPick('teacher')"></select>
+        <input type="text" id="teacher" value="คุณครู" placeholder="พิมพ์ชื่อครูผู้สอน" style="display:none;margin-top:8px;">
+      </label>
     </div>
 
     <div class="group">
@@ -589,28 +600,59 @@
     render();
   }
 
-  /* --- โหลดฐานข้อมูลรายชื่อจาก data.json (จัดการผ่านหน้า GitHub) --- */
-  function fillDatalist(id, arr){
-    if(!Array.isArray(arr)) return;
-    const dl = $(id); if(!dl) return;
-    dl.innerHTML = arr.filter(Boolean).map(v=>`<option value="${esc(v)}">`).join('');
+  /* --- ดรอปดาวน์เลือกชื่อ (ดึงรายการจาก data.json) --- */
+  const CUSTOM = '__custom__';
+
+  function setStatus(msg, ok){
+    const el = $('dbStatus'); if(!el) return;
+    el.textContent = msg;
+    if(ok){ el.style.background='#ecfdf5'; el.style.borderColor='#a7f3d0'; el.style.color='#065f46'; }
+    else  { el.style.background='#fff7ed'; el.style.borderColor='#fed7aa'; el.style.color='#9a3412'; }
   }
+
+  // สร้างตัวเลือกในดรอปดาวน์ของช่องที่กำหนด (teacher/school/area)
+  function setupPicker(field, arr){
+    const sel = $(field+'Sel'); const inp = $(field);
+    if(!sel || !inp) return;
+    arr = (Array.isArray(arr) ? arr : []).filter(Boolean);
+    sel.innerHTML =
+      arr.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('') +
+      `<option value="${CUSTOM}">➕ พิมพ์ชื่อเอง...</option>`;
+    if(arr.length){
+      sel.value = arr[0]; inp.value = arr[0]; inp.style.display = 'none';
+    }else{
+      sel.value = CUSTOM; inp.style.display = '';   // ไม่มีรายการ → โหมดพิมพ์เอง
+    }
+  }
+
+  // เมื่อผู้ใช้เลือกจากดรอปดาวน์
+  function onPick(field){
+    const sel = $(field+'Sel'); const inp = $(field);
+    if(sel.value === CUSTOM){ inp.style.display=''; inp.value=''; inp.focus(); }
+    else { inp.style.display='none'; inp.value = sel.value; }
+    render();
+  }
+
+  // โหลดฐานข้อมูลรายชื่อจาก data.json (จัดการผ่านหน้า GitHub)
   async function loadDatabase(){
+    // ตั้งดรอปดาวน์เริ่มต้นจากค่าที่กรอกไว้ (กันช่วงที่ยังโหลดไฟล์ไม่เสร็จ)
+    setupPicker('teacher', [$('teacher').value]);
+    setupPicker('school',  [$('school').value]);
+    setupPicker('area',    [$('area').value]);
+    render();
     try{
       const res = await fetch('data.json', {cache:'no-store'});
-      if(!res.ok) throw new Error('สถานะ ' + res.status);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      // เติมตัวเลือกใน dropdown (ยังพิมพ์ชื่อใหม่เองได้)
-      fillDatalist('teacherList', data.teachers);
-      fillDatalist('schoolList',  data.schools);
-      fillDatalist('areaList',    data.areas);
-      // โรงเรียน/เขต มักมีค่าเดียว → เติมตัวแรกให้อัตโนมัติ (ผู้ใช้ยังเลือก/พิมพ์เปลี่ยนได้)
-      if(Array.isArray(data.schools) && data.schools[0]) $('school').value = data.schools[0];
-      if(Array.isArray(data.areas)   && data.areas[0])   $('area').value   = data.areas[0];
+      setupPicker('teacher', data.teachers);
+      setupPicker('school',  data.schools);
+      setupPicker('area',    data.areas);
       render();
+      const nT=(data.teachers||[]).length, nS=(data.schools||[]).length, nA=(data.areas||[]).length;
+      setStatus(`✅ โหลด data.json สำเร็จ — ครู ${nT} • โรงเรียน ${nS} • เขต ${nA}`, true);
     }catch(e){
-      // โหลดไม่ได้ (เช่นเปิดไฟล์จากเครื่องตรงๆ ยังไม่ขึ้น GitHub) → ใช้ค่าเริ่มต้นเดิม ไม่ต้องทำอะไร
-      console.log('ℹ️ ใช้ค่าเริ่มต้น (ยังโหลด data.json ไม่ได้):', e.message);
+      setStatus('ℹ️ ยังไม่พบ data.json — ใช้ค่าเริ่มต้น (เลือก “พิมพ์ชื่อเอง” เพื่อกรอกเองได้) | ' + e.message, false);
+      console.log('โหลด data.json ไม่ได้:', e);
     }
   }
 
