@@ -296,8 +296,8 @@
     <div class="group">
       <p class="eyebrow">สถาบัน</p>
       <!-- อัปเดตชื่อโรงเรียนตั้งต้นให้สอดคล้องกับโลโก้ สพฐ. -->
-      <label><span class="lab">ชื่อโรงเรียน / สถาบัน</span><input type="text" id="school" value="โรงเรียนบ้านคลอง 14"></label>
-      <label><span class="lab">สำนักงานเขตพื้นที่การศึกษา</span><input type="text" id="area" value="สำนักงานเขตพื้นที่การศึกษาประถมศึกษานครนายก"></label>
+      <label><span class="lab">ชื่อโรงเรียน / สถาบัน</span><input type="text" id="school" list="schoolList" value="โรงเรียนบ้านคลอง 14"><datalist id="schoolList"></datalist></label>
+      <label><span class="lab">สำนักงานเขตพื้นที่การศึกษา</span><input type="text" id="area" list="areaList" value="สำนักงานเขตพื้นที่การศึกษาประถมศึกษานครนายก"><datalist id="areaList"></datalist></label>
       <div class="lab" style="margin-bottom:5px">ตราโรงเรียน (ถ้ามี)</div>
       <div style="display:flex; align-items:center; gap:12px;">
         <!-- พรีวิวโลโก้ตั้งต้น -->
@@ -343,7 +343,7 @@
 
     <div class="group">
       <p class="eyebrow">เสนอ</p>
-      <label style="margin:0"><span class="lab">ครูผู้สอน</span><input type="text" id="teacher" value="คุณครู"></label>
+      <label style="margin:0"><span class="lab">ครูผู้สอน</span><input type="text" id="teacher" list="teacherList" value="คุณครู"><datalist id="teacherList"></datalist></label>
     </div>
 
     <div class="group">
@@ -589,8 +589,34 @@
     render();
   }
 
+  /* --- โหลดฐานข้อมูลรายชื่อจาก data.json (จัดการผ่านหน้า GitHub) --- */
+  function fillDatalist(id, arr){
+    if(!Array.isArray(arr)) return;
+    const dl = $(id); if(!dl) return;
+    dl.innerHTML = arr.filter(Boolean).map(v=>`<option value="${esc(v)}">`).join('');
+  }
+  async function loadDatabase(){
+    try{
+      const res = await fetch('data.json', {cache:'no-store'});
+      if(!res.ok) throw new Error('สถานะ ' + res.status);
+      const data = await res.json();
+      // เติมตัวเลือกใน dropdown (ยังพิมพ์ชื่อใหม่เองได้)
+      fillDatalist('teacherList', data.teachers);
+      fillDatalist('schoolList',  data.schools);
+      fillDatalist('areaList',    data.areas);
+      // โรงเรียน/เขต มักมีค่าเดียว → เติมตัวแรกให้อัตโนมัติ (ผู้ใช้ยังเลือก/พิมพ์เปลี่ยนได้)
+      if(Array.isArray(data.schools) && data.schools[0]) $('school').value = data.schools[0];
+      if(Array.isArray(data.areas)   && data.areas[0])   $('area').value   = data.areas[0];
+      render();
+    }catch(e){
+      // โหลดไม่ได้ (เช่นเปิดไฟล์จากเครื่องตรงๆ ยังไม่ขึ้น GitHub) → ใช้ค่าเริ่มต้นเดิม ไม่ต้องทำอะไร
+      console.log('ℹ️ ใช้ค่าเริ่มต้น (ยังโหลด data.json ไม่ได้):', e.message);
+    }
+  }
+
   /* ---- Init ---- */
   ['school','area','title','subject','code','grade','room','teacher','term','year'].forEach(id=>$(id).addEventListener('input',render));
   renderMembers(); render(); 
   $('sheet').style.setProperty('--scale', $('fontScale').value);
+  loadDatabase();
 </script>
